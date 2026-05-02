@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FG Combo Cue Trainer</title>
+  <style>
+    :root {
+      --bg: #101217;
+      --panel: #171b22;
+      --text: #e8ecf4;
+      --muted: #a8b1c2;
+      --accent: #31d07f;
+      --danger: #ff5e63;
+      --warn: #ffd166;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, "Noto Sans JP", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 16px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid #262c36;
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    h1 { margin: 0 0 6px; font-size: clamp(1.2rem, 1.4vw + 1rem, 2rem); }
+    p, li { color: var(--muted); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.92rem;
+      color: #d7deea;
+    }
+
+    input, select, button {
+      border-radius: 9px;
+      border: 1px solid #303847;
+      background: #11151b;
+      color: var(--text);
+      padding: 10px;
+      font: inherit;
+    }
+
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    button { cursor: pointer; min-width: 90px; }
+    #startBtn { background: var(--accent); color: #0b1116; font-weight: 700; border: none; }
+    #stopBtn { background: #2c3240; }
+    #resetBtn { background: #222832; }
+
+    .error {
+      color: #fff;
+      background: #582229;
+      border: 1px solid #8f3340;
+      border-radius: 10px;
+      padding: 10px;
+      display: none;
+      white-space: pre-wrap;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .metric {
+      background: #11151b;
+      border-radius: 10px;
+      border: 1px solid #2a3240;
+      padding: 10px;
+    }
+
+    .metric .name { color: var(--muted); font-size: 0.84rem; }
+    .metric .value { font-size: 1.35rem; font-weight: 700; margin-top: 2px; }
+    .metric.big .value { font-size: clamp(2rem, 4.2vw, 3rem); }
+
+    .flash-area {
+      height: min(36vh, 280px);
+      border-radius: 12px;
+      border: 1px solid #323a47;
+      background: radial-gradient(circle at center, #242a35 0%, #161b23 62%, #12171e 100%);
+      display: grid;
+      place-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .flash-area.active {
+      background: radial-gradient(circle at center, #fff 0%, #eef4ff 40%, #9eb6e0 100%);
+      box-shadow: 0 0 60px #9ac6ff;
+      color: #09111d;
+    }
+
+    .cue-label {
+      font-size: clamp(2rem, 6vw, 4rem);
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      opacity: 0;
+      transform: scale(0.92);
+      transition: opacity 0.05s linear, transform 0.08s ease-out;
+      color: #ffffff;
+      text-shadow: 0 0 20px rgba(255,255,255,.35);
+    }
+
+    .flash-area.active .cue-label { color: #0a1320; text-shadow: none; }
+
+    .cue-label.show {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .help { font-size: .92rem; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <h1>FG Combo Cue Trainer</h1>
+      <p>指定フレームでビープ音と画面フラッシュを出す練習用ツールです（ローカルでそのまま動作）。</p>
+      <div id="errorBox" class="error" role="alert"></div>
+
+      <div class="grid">
+        <label>Cue Frames (comma separated)
+          <input id="cueFrames" type="text" value="0,29,47" inputmode="numeric" />
+        </label>
+
+        <label>Loop Length Frames
+          <input id="loopLength" type="number" value="64" min="1" step="1" />
+        </label>
+
+        <label>FPS
+          <input id="fps" type="number" value="60" min="1" step="1" />
+        </label>
+
+        <label>Beep Frequency Hz
+          <input id="freq" type="number" value="880" min="20" step="1" />
+        </label>
+
+        <label>Beep Duration Ms
+          <input id="beepDuration" type="number" value="50" min="1" step="1" />
+        </label>
+
+        <label>Volume (0-1)
+          <input id="volume" type="number" value="0.5" min="0" max="1" step="0.01" />
+        </label>
+
+        <label>Flash Duration Ms
+          <input id="flashDuration" type="number" value="80" min="1" step="1" />
+        </label>
+
+        <label>Mode
+          <select id="mode">
+            <option value="av" selected>Audio + Visual</option>
+            <option value="audio">Audio Only</option>
+            <option value="visual">Visual Only</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="buttons">
+        <button id="startBtn" type="button">Start</button>
+        <button id="stopBtn" type="button">Stop</button>
+        <button id="resetBtn" type="button">Reset</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="flash-area" id="flashArea" aria-live="polite">
+        <div id="cueLabel" class="cue-label">READY</div>
+      </div>
+
+      <div class="status-grid">
+        <div class="metric big"><div class="name">現在フレーム (loop)</div><div id="currentFrame" class="value">0.00F</div></div>
+        <div class="metric"><div class="name">経過 ms</div><div id="elapsedMs" class="value">0.0</div></div>
+        <div class="metric"><div class="name">次の Cue Frame</div><div id="nextCue" class="value">-</div></div>
+        <div class="metric"><div class="name">ループ回数</div><div id="loopCount" class="value">0</div></div>
+        <div class="metric"><div class="name">Cue Frames</div><div id="cueList" class="value">0,29,47</div></div>
+        <div class="metric"><div class="name">最後に発火した Cue</div><div id="lastCue" class="value">-</div></div>
+        <div class="metric"><div class="name">再生状態</div><div id="playState" class="value">stopped</div></div>
+      </div>
+    </section>
+
+    <section class="card help">
+      <strong>使い方:</strong>
+      <ol>
+        <li>Cue Frames に <code>0,29,47</code> を入力。</li>
+        <li>Loop Length Frames に <code>64</code> などを入力。</li>
+        <li><strong>Start</strong> を押す。</li>
+        <li>0F / 29F / 47F で音とフラッシュが出る。</li>
+        <li><strong>Stop</strong> または <strong>Reset</strong> で停止。</li>
+      </ol>
+      <p>判定は <code>requestAnimationFrame</code> + <code>performance.now()</code> で行い、フレーム境界の通過を検出します。</p>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const els = {
+        cueFrames: document.getElementById('cueFrames'),
+        loopLength: document.getElementById('loopLength'),
+        fps: document.getElementById('fps'),
+        freq: document.getElementById('freq'),
+        beepDuration: document.getElementById('beepDuration'),
+        volume: document.getElementById('volume'),
+        flashDuration: document.getElementById('flashDuration'),
+        mode: document.getElementById('mode'),
+        startBtn: document.getElementById('startBtn'),
+        stopBtn: document.getElementById('stopBtn'),
+        resetBtn: document.getElementById('resetBtn'),
+        flashArea: document.getElementById('flashArea'),
+        cueLabel: document.getElementById('cueLabel'),
+        errorBox: document.getElementById('errorBox'),
+        currentFrame: document.getElementById('currentFrame'),
+        elapsedMs: document.getElementById('elapsedMs'),
+        nextCue: document.getElementById('nextCue'),
+        loopCount: document.getElementById('loopCount'),
+        cueList: document.getElementById('cueList'),
+        lastCue: document.getElementById('lastCue'),
+        playState: document.getElementById('playState')
+      };
+
+      let audioCtx = null;
+      let rafId = null;
+      let startTime = 0;
+      let prevLoopFrame = 0;
+      let prevLoopCount = 0;
+      let playing = false;
+      let firedInLoop = new Set();
+      let flashTimer = null;
+      let labelTimer = null;
+
+      let settings = null;
+
+      function setError(msg) {
+        if (!msg) {
+          els.errorBox.style.display = 'none';
+          els.errorBox.textContent = '';
+          return;
+        }
+        els.errorBox.style.display = 'block';
+        els.errorBox.textContent = msg;
+      }
+
+      function updateStateText(text) { els.playState.textContent = text; }
+
+      function parseSettings() {
+        const errors = [];
+        const loopLengthFrames = Number(els.loopLength.value);
+        const fps = Number(els.fps.value);
+        const freq = Number(els.freq.value);
+        const beepDurationMs = Number(els.beepDuration.value);
+        const volume = Number(els.volume.value);
+        const flashDurationMs = Number(els.flashDuration.value);
+
+        if (!Number.isFinite(loopLengthFrames) || loopLengthFrames <= 0) errors.push('Loop Length Frames は 1 以上の数値を入力してください。');
+        if (!Number.isFinite(fps) || fps <= 0) errors.push('FPS は 1 以上の数値を入力してください。');
+        if (!Number.isFinite(freq) || freq <= 0) errors.push('Beep Frequency は 1 以上の数値を入力してください。');
+        if (!Number.isFinite(beepDurationMs) || beepDurationMs <= 0) errors.push('Beep Duration Ms は 1 以上の数値を入力してください。');
+        if (!Number.isFinite(volume) || volume < 0 || volume > 1) errors.push('Volume は 0〜1 で指定してください。');
+        if (!Number.isFinite(flashDurationMs) || flashDurationMs <= 0) errors.push('Flash Duration Ms は 1 以上の数値を入力してください。');
+
+        const cueInput = els.cueFrames.value.trim();
+        if (!cueInput) errors.push('Cue Frames を入力してください。');
+
+        const rawCues = cueInput.split(',').map(v => v.trim()).filter(Boolean);
+        const cueNums = rawCues.map(v => Number(v));
+        if (cueNums.some(v => !Number.isFinite(v) || !Number.isInteger(v))) {
+          errors.push('Cue Frames はカンマ区切りの整数で入力してください。 例: 0,29,47');
+        }
+
+        const cueFrames = [...new Set(cueNums)].sort((a, b) => a - b);
+
+        if (Number.isFinite(loopLengthFrames) && loopLengthFrames > 0) {
+          const bad = cueFrames.filter(c => c < 0 || c >= loopLengthFrames);
+          if (bad.length) errors.push(`Cue Frame は 0 以上 ${loopLengthFrames - 1} 以下で指定してください。不正: ${bad.join(', ')}`);
+        }
+
+        if (errors.length) {
+          setError(errors.join('\n'));
+          return null;
+        }
+
+        return {
+          cueFrames,
+          loopLengthFrames,
+          fps,
+          frameMs: 1000 / fps,
+          freq,
+          beepDurationMs,
+          volume,
+          flashDurationMs,
+          mode: els.mode.value
+        };
+      }
+
+      async function ensureAudioContext() {
+        if (!audioCtx) audioCtx = new AudioContext();
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+      }
+
+      function beep() {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        const now = audioCtx.currentTime;
+        const durSec = settings.beepDurationMs / 1000;
+        const end = now + durSec;
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(settings.freq, now);
+
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setValueAtTime(settings.volume, now);
+        gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, settings.volume * 0.02), end);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(now);
+        osc.stop(end);
+      }
+
+      function flash(cueFrame) {
+        els.flashArea.classList.add('active');
+        els.cueLabel.textContent = `${cueFrame}F`;
+        els.cueLabel.classList.add('show');
+
+        clearTimeout(flashTimer);
+        clearTimeout(labelTimer);
+
+        flashTimer = setTimeout(() => els.flashArea.classList.remove('active'), settings.flashDurationMs);
+        labelTimer = setTimeout(() => els.cueLabel.classList.remove('show'), settings.flashDurationMs + 120);
+      }
+
+      function onCue(cue) {
+        if (settings.mode !== 'visual') beep();
+        if (settings.mode !== 'audio') flash(cue);
+        els.lastCue.textContent = `${cue}F`;
+      }
+
+      function crossedCue(prev, curr, cue, loopLen) {
+        if (prev <= curr) {
+          return cue > prev && cue <= curr;
+        }
+        return cue > prev || cue <= curr;
+      }
+
+      function updateNextCue(loopFrame) {
+        const next = settings.cueFrames.find(c => c > loopFrame);
+        els.nextCue.textContent = `${(next ?? settings.cueFrames[0])}F`;
+      }
+
+      function tick(now) {
+        if (!playing) return;
+
+        const elapsedMs = now - startTime;
+        const absoluteFrame = elapsedMs / settings.frameMs;
+        const loopCount = Math.floor(absoluteFrame / settings.loopLengthFrames);
+        const loopFrame = absoluteFrame % settings.loopLengthFrames;
+
+        if (loopCount !== prevLoopCount) {
+          firedInLoop.clear();
+          prevLoopCount = loopCount;
+        }
+
+        for (const cue of settings.cueFrames) {
+          if (firedInLoop.has(cue)) continue;
+          if (crossedCue(prevLoopFrame, loopFrame, cue, settings.loopLengthFrames)) {
+            firedInLoop.add(cue);
+            onCue(cue);
+          }
+        }
+
+        prevLoopFrame = loopFrame;
+
+        els.currentFrame.textContent = `${loopFrame.toFixed(2)}F`;
+        els.elapsedMs.textContent = elapsedMs.toFixed(1);
+        els.loopCount.textContent = String(loopCount);
+        updateNextCue(loopFrame);
+
+        rafId = requestAnimationFrame(tick);
+      }
+
+      async function start() {
+        const parsed = parseSettings();
+        if (!parsed) return;
+        settings = parsed;
+
+        try {
+          await ensureAudioContext();
+        } catch {
+          setError('AudioContext の初期化に失敗しました。ブラウザ設定を確認してください。');
+          return;
+        }
+
+        if (playing) return;
+
+        setError('');
+        els.cueList.textContent = settings.cueFrames.join(', ');
+        updateStateText('playing');
+        playing = true;
+
+        startTime = performance.now();
+        prevLoopFrame = 0;
+        prevLoopCount = 0;
+        firedInLoop.clear();
+        els.lastCue.textContent = '-';
+        els.cueLabel.textContent = 'READY';
+
+        rafId = requestAnimationFrame(tick);
+      }
+
+      function stop() {
+        if (!playing) return;
+        playing = false;
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = null;
+        updateStateText('stopped');
+      }
+
+      function reset() {
+        stop();
+        prevLoopFrame = 0;
+        prevLoopCount = 0;
+        firedInLoop.clear();
+        clearTimeout(flashTimer);
+        clearTimeout(labelTimer);
+        els.flashArea.classList.remove('active');
+        els.cueLabel.classList.remove('show');
+        els.cueLabel.textContent = 'READY';
+        els.currentFrame.textContent = '0.00F';
+        els.elapsedMs.textContent = '0.0';
+        els.loopCount.textContent = '0';
+        els.nextCue.textContent = '-';
+        els.lastCue.textContent = '-';
+      }
+
+      els.startBtn.addEventListener('click', start);
+      els.stopBtn.addEventListener('click', stop);
+      els.resetBtn.addEventListener('click', reset);
+
+      updateStateText('stopped');
+    })();
+  </script>
+</body>
+</html>
